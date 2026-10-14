@@ -4074,6 +4074,53 @@
       window.showDashboard();
     };
 
+    window.toggleTheme = function () {
+      var body = document.body;
+      var theme = body && body.classList && body.classList.contains('theme-light') ? 'dark' : 'light';
+      body.classList.remove('theme-dark', 'theme-light');
+      body.classList.add('theme-' + theme);
+      body.setAttribute('data-theme', theme);
+      if (theme === 'light') {
+        body.style.background = '#edf4ff';
+        body.style.color = '#101b2d';
+      } else {
+        body.style.background = '#070c13';
+        body.style.color = '#ebf4ff';
+      }
+      setText('rt-last-action', 'theme toggled: ' + theme);
+      appendChatMessage('global', 'System', 'Theme switched to ' + theme + ' mode.', true);
+    };
+
+    window.toggleNotifications = function () {
+      var dropdown = safeById('notifications-dropdown');
+      if (!dropdown) return;
+      var isVisible = dropdown.style.display === 'block';
+      dropdown.style.display = isVisible ? 'none' : 'block';
+      dropdown.setAttribute('aria-expanded', isVisible ? 'false' : 'true');
+      setText('rt-last-action', 'notifications ' + (isVisible ? 'closed' : 'opened'));
+    };
+
+    window.toggleFullscreen = function () {
+      var doc = document;
+      var root = doc.documentElement;
+      if (!doc.fullscreenElement && !doc.webkitFullscreenElement && !doc.msFullscreenElement) {
+        if (root.requestFullscreen) {
+          root.requestFullscreen();
+        } else if (root.webkitRequestFullscreen) {
+          root.webkitRequestFullscreen();
+        } else if (root.msRequestFullscreen) {
+          root.msRequestFullscreen();
+        }
+      } else if (doc.exitFullscreen) {
+        doc.exitFullscreen();
+      } else if (doc.webkitExitFullscreen) {
+        doc.webkitExitFullscreen();
+      } else if (doc.msExitFullscreen) {
+        doc.msExitFullscreen();
+      }
+      setText('rt-last-action', 'fullscreen toggled');
+    };
+
     window.openAllMetaverseProjects = function () {
       var list = uiState && uiState.experiences ? uiState.experiences : [];
       var opened = 0;
