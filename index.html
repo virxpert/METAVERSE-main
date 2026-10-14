@@ -37,6 +37,25 @@
       user-select: none;
       transition: filter 180ms ease, background 220ms ease;
     }
+    body.mv-theme-light {
+      background:
+        radial-gradient(1300px 640px at 12% -18%, rgba(73, 155, 211, 0.18), transparent 62%),
+        radial-gradient(1000px 520px at 98% 125%, rgba(57, 118, 158, 0.18), transparent 60%),
+        linear-gradient(180deg, #dfeeff 0%, #bfdaf3 100%);
+      color: #11263c;
+    }
+    body.mv-theme-light #navbar {
+      background: linear-gradient(180deg, rgba(225, 239, 250, 0.96), rgba(205, 226, 242, 0.96));
+      border-bottom-color: #9ec7e6;
+    }
+    body.mv-theme-light #sidebar {
+      background: linear-gradient(180deg, rgba(219, 236, 247, 0.96), rgba(196, 220, 240, 0.96));
+      border-right-color: #9ec7e6;
+    }
+    body.mv-theme-light .utility-btn,
+    body.mv-theme-light .stat-badge {
+      background: rgba(222, 236, 246, 0.9); color: #0f2940; border-color: #8bb9d9;
+    }
     body::before {
       content: '';
       position: fixed;
@@ -106,9 +125,29 @@
     }
     .top-search:focus { border-color: #74cfff; box-shadow: 0 0 0 2px rgba(116, 207, 255, 0.16), inset 0 0 0 1px rgba(146, 208, 245, 0.12); }
     .top-search::placeholder { color: #a5cadf; }
-    .hud-stats { display: flex; justify-content: flex-end; gap: 10px; font-weight: 700; font-size: 0.84rem; }
+    .hud-stats { display: flex; justify-content: flex-end; align-items: center; gap: 10px; font-weight: 700; font-size: 0.84rem; }
     .stat-badge { background: rgba(20, 70, 104, 0.9); padding: 6px 12px; border-radius: 999px; border: 1px solid #3e7ea9; color: #d4ecfb; white-space: nowrap; }
     .stat-badge span { color: #ffffff; }
+    .utility-actions {
+      display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-left: 8px;
+    }
+    .utility-btn {
+      border: 1px solid #3d7fa8; border-radius: 999px; background: rgba(18, 70, 104, 0.9); color: #dff6ff; cursor: pointer;
+      width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; box-shadow: inset 0 0 0 1px rgba(159, 228, 255, 0.06);
+    }
+    .utility-btn:hover { border-color: #7ecbff; transform: translateY(-1px); }
+    .notification-bell { position: relative; }
+    .notification-count {
+      position: absolute; top: -4px; right: -2px; min-width: 16px; height: 16px; border-radius: 999px; background: #ffca4a; color: #0d1d2b; font-size: 0.62rem; font-weight: 900; display: grid; place-items: center; padding: 0 4px;
+    }
+    .notifications-dropdown {
+      position: absolute; top: calc(var(--mv-nav-h) + 10px); right: 18px; width: min(320px, calc(100vw - 34px)); background: rgba(17, 61, 91, 0.96); border: 1px solid #3b7ea8; border-radius: 12px; box-shadow: 0 16px 30px rgba(0,0,0,0.2); padding: 12px; z-index: 30; display: none;
+    }
+    .notifications-dropdown.active { display: grid; gap: 8px; }
+    .notification-header { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: #9edbff; font-weight: 800; }
+    .notification-item { border: 1px solid rgba(120, 184, 222, 0.28); border-radius: 10px; background: rgba(14, 47, 71, 0.9); padding: 8px 10px; color: #d9f2ff; font-size: 0.74rem; }
+    .notification-item strong { display: block; margin-bottom: 2px; color: #f1f9ff; }
+    .notification-item small { display: block; margin-top: 3px; color: #9fd6f2; }
 
     /* Sidebar Nav */
     #sidebar {
@@ -1372,7 +1411,22 @@
       <div class="stat-badge">Nano_banana</div>
       <div class="stat-badge">M$ <span id="user-coins">500</span></div>
       <div class="stat-badge">XP <span id="user-xp">1000</span></div>
+      <div class="utility-actions">
+        <button class="utility-btn" id="theme-toggle" type="button" aria-label="Toggle theme" onclick="toggleTheme()">☼</button>
+        <button class="utility-btn" id="fullscreen-btn" type="button" aria-label="Toggle fullscreen" onclick="toggleFullscreen()">⛶</button>
+        <button class="utility-btn notification-bell" id="notification-btn" type="button" aria-label="Notifications" onclick="toggleNotifications()">
+          🔔
+          <span class="notification-count">3</span>
+        </button>
+      </div>
     </div>
+  </div>
+
+  <div id="notifications-dropdown" class="notifications-dropdown" aria-live="polite">
+    <div class="notification-header">Notifications</div>
+    <div class="notification-item" onclick="claimDailyReward()"><strong>🎁 Daily reward ready</strong> Claim your M$ 200 bonus and a small XP boost.<small>Just now</small></div>
+    <div class="notification-item"><strong>👥 Friend request</strong> NovaBuilder wants to party in the next arena match.<small>6 min ago</small></div>
+    <div class="notification-item"><strong>🏆 Badge unlocked</strong> You reached the first launch milestone.<small>Today</small></div>
   </div>
 
   <!-- Left Navigation Sidebar -->
@@ -1449,6 +1503,7 @@
         <button class="btn-action" onclick="runSandboxProbe()">Run Sandbox Probe</button>
         <button class="btn-action" onclick="toggleDebugMode()">Toggle Debug Mode</button>
         <button class="btn-action" onclick="runDebugSweep()">Run Debug Sweep</button>
+        <button class="btn-action" onclick="window.openAllMetaverseProjects && window.openAllMetaverseProjects()">Open All Metaverse Apps</button>
       </div>
     </div>
     <div id="badge-panel" class="badge-panel">
@@ -1503,6 +1558,18 @@
       <div class="chat-msg"><span>v1.5 Spatial:</span> 790 local prediction/reconciliation stub active.</div>
       <div class="chat-msg"><span>v1.5 Identity:</span> 784 tier separation scaffolded and evented.</div>
       <div class="chat-msg"><span>v1.5 Security:</span> 871 deny-by-default sandbox mock enabled.</div>
+    </div>
+  </div>
+
+  <div id="modal-daily" class="app-modal">
+    <span class="modal-close" onclick="closeModals()">✖</span>
+    <div class="section-title">Daily Reward</div>
+    <div class="quality-panel" style="margin-top: 12px;">
+      <div class="quality-title">METAVERSE Daily Login</div>
+      <div class="quality-note" id="daily-reward-status">Claim your daily login reward to refresh coins and XP.</div>
+      <div class="quality-actions" style="margin-top: 12px;">
+        <button class="btn-action" type="button" onclick="claimDailyReward()">Claim Reward</button>
+      </div>
     </div>
   </div>
 
@@ -1576,6 +1643,7 @@
       <button class="more-tile" type="button" onclick="openModal('modal-shop')">Marketplace</button>
       <button class="more-tile" type="button" onclick="openModal('modal-settings')">Settings</button>
       <button class="more-tile" type="button" onclick="openModal('modal-updates')">Newsroom</button>
+      <button class="more-tile" type="button" onclick="claimDailyReward()">Daily Reward</button>
       <button class="more-tile" type="button" onclick="openModal('modal-profile')">Profile</button>
       <button class="more-tile" type="button" onclick="openModal('modal-chat-hub')">Messages</button>
       <button class="more-tile" type="button" onclick="openModal('modal-games')">Experiences</button>
@@ -1584,6 +1652,20 @@
       <button class="more-tile" type="button" onclick="logoutAccount()">Log Out</button>
       <button class="more-tile" type="button" onclick="runAllChecks()">Safety Check</button>
       <button class="more-tile" type="button" onclick="runDebugSweep('manual', true)">Debug Repair</button>
+    </div>
+  </div>
+
+  <div id="modal-bot-captcha" class="app-modal">
+    <span class="modal-close" onclick="closeModals()">✖</span>
+    <div class="section-title">Human Check</div>
+    <div class="quality-panel" style="margin-top: 12px;">
+      <div id="bot-captcha-label" class="quality-note">Verify you are human to continue.</div>
+      <div class="quality-title" id="bot-captcha-question" style="margin-top: 10px; font-size: 1.1rem;">2 + 2 = ?</div>
+      <div class="quality-actions" style="margin-top: 12px;">
+        <input id="bot-captcha-answer" type="text" class="market-search" placeholder="Type the answer" maxlength="12" />
+        <button class="btn-action" type="button" onclick="submitBotCaptcha()">Verify</button>
+      </div>
+      <div id="bot-captcha-error" class="quality-note" style="color:#ff9da0; min-height: 18px; margin-top: 8px;">&nbsp;</div>
     </div>
   </div>
 
@@ -1741,6 +1823,7 @@
       <div class="chat-input-box">
         <div class="chat-input-row">
           <input id="chat-input-global" type="text" placeholder="Type to global chat..." />
+          <button class="chat-send" onclick="forwardChatMessage('global')">Forward</button>
           <button class="chat-send" onclick="sendChatMessage('global')">Send</button>
         </div>
       </div>
@@ -1753,6 +1836,7 @@
       <div class="chat-input-box">
         <div class="chat-input-row">
           <input id="chat-input-friends" type="text" placeholder="Message friends..." />
+          <button class="chat-send" onclick="forwardChatMessage('friends')">Forward</button>
           <button class="chat-send" onclick="sendChatMessage('friends')">Send</button>
         </div>
       </div>
@@ -1799,34 +1883,29 @@
 
   <button id="ai-launcher" type="button" aria-label="Open AI assistant" title="AI Assistant" onclick="toggleAiAssistant()"><span class="mv-icon icon-tone-electric" aria-hidden="true"><svg><use href="#mv-bot"></use></svg></span></button>
 
-  <!-- Vercel Insights are loaded only in http(s) environments -->
   <script>
     (function () {
-      var protocol = window.location.protocol;
-      if (protocol !== 'http:' && protocol !== 'https:') return;
+      if (!('serviceWorker' in navigator)) return;
 
-      window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
-      window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+      function registerWorker() {
+        navigator.serviceWorker.register('service-worker.js')
+          .then(function (reg) {
+            console.log('🎮 METAVERSE Service Worker registered');
+            if (reg.waiting) {
+              reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+            }
+          })
+          .catch(function (err) {
+            console.log('⚠️ Service Worker registration failed:', err);
+          });
+      }
 
-      var speed = document.createElement('script');
-      speed.defer = true;
-      speed.src = '/_vercel/speed-insights/script.js';
-      document.body.appendChild(speed);
-
-      var analytics = document.createElement('script');
-      analytics.defer = true;
-      analytics.src = '/_vercel/insights/script.js';
-      document.body.appendChild(analytics);
+      if (document.readyState === 'complete') {
+        registerWorker();
+      } else {
+        window.addEventListener('load', registerWorker, { once: true });
+      }
     })();
-  </script>
-
-  <script>
-    // Ensure service worker registration is relative to the file location
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js')
-        .then(reg => console.log('🎮 METAVERSE Service Worker registered'))
-        .catch(err => console.log('⚠️ Service Worker registration failed:', err));
-    }
   </script>
 
   <script src="./runtime-foundation.js"></script>

@@ -1,28 +1,26 @@
 // METAVERSE Service Worker - improved offline behavior
-const CACHE_NAME = 'metaverse-v1.0.2';
+const CACHE_NAME = 'metaverse-v3';
 const PRECACHE_URLS = [
   './',
   './index.html',
-  './manifest.json',
   './offline.html',
+  './archive/METAVERSE_v1.4.html',
+  './manifest.json',
   './runtime-foundation.js',
   './vendor/three.0.128.0.min.js'
 ];
 
-// Install - pre-cache same-origin assets
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(PRECACHE_URLS))
       .catch(err => {
-        // If precache partially fails, log but allow SW to install
         console.warn('⚠️ Precaching failed:', err);
       })
   );
   self.skipWaiting();
 });
 
-// Activate - cleanup old caches
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => Promise.all(
@@ -32,62 +30,57 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-// Fetch - network-first for navigation, cache-first for same-origin assets
 self.addEventListener('fetch', event => {
   const req = event.request;
-
-  // Only handle GET
-  if (req.method !== 'GET') return;
-
   const url = new URL(req.url);
 
-  // Handle navigation requests (HTML pages)
+  if (req.method !== 'GET') return;
+  if (req.cache === 'only-if-cached' && url.origin !== location.origin) return;
+
   if (req.mode === 'navigate' || (req.headers.get('accept') || '').includes('text/html')) {
     event.respondWith(
       fetch(req)
         .then(networkResponse => {
-          // Update cached index.html for SPA navigations
           if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
             const copy = networkResponse.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put('./index.html', copy));
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put('./index.html', copy);
+              if (url.pathname.endsWith('/archive/METAVERSE_v1.4.html')) {
+                cache.put('./archive/METAVERSE_v1.4.html', copy);
+              }
+            });
           }
           return networkResponse;
         })
-        .catch(() => {
-          // If network fails, serve cached page or offline fallback
-          return caches.match(req).then(cached => cached || caches.match('./offline.html'));
-        })
+        .catch(() => caches.match(req).then(cached => cached || caches.match('./offline.html')))
     );
     return;
   }
 
-  // Same-origin assets: try cache first, then network (and cache the result)
   if (url.origin === location.origin) {
     event.respondWith(
       caches.match(req).then(cached => {
         if (cached) return cached;
-        return fetch(req).then(networkResponse => {
-          // Only cache successful responses
-          if (networkResponse && networkResponse.status === 200) {
-            const respClone = networkResponse.clone();
-            caches.open(CACHE_NAME).then(cache => {
-              cache.put(req, respClone).catch(() => { /* ignore put failures */ });
-            });
-          }
-          return networkResponse;
-        }).catch(() => {
-          // Avoid returning HTML fallback for JS/CSS/image requests.
-          if (req.destination === 'document') {
-            return caches.match('./offline.html');
-          }
-          return Response.error();
-        });
+
+        return fetch(req)
+          .then(networkResponse => {
+            if (networkResponse && networkResponse.status === 200) {
+              const clone = networkResponse.clone();
+              caches.open(CACHE_NAME).then(cache => cache.put(req, clone));
+            }
+            return networkResponse;
+          })
+          .catch(() => {
+            if (req.destination === 'document') {
+              return caches.match('./offline.html');
+            }
+            return Response.error();
+          });
       })
     );
     return;
   }
 
-  // Cross-origin requests (CDN etc) - try network, fallback to cache/offline
   event.respondWith(
     fetch(req).catch(() => {
       if (req.mode === 'navigate' || req.destination === 'document') {
@@ -98,7 +91,6 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// Support skipWaiting from the page
 self.addEventListener('message', event => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();

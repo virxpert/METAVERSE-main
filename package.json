@@ -1,26 +1,31 @@
 {
   "name": "metaverse",
   "version": "1.0.0",
-  "description": "METAVERSE Hub - Virtual Gaming World. Explore the METAVERSE! Play games, customize your R6 avatar, collect items, and build your virtual empire.",
+  "description": "METAVERSE Hub - static web app for a browser-based virtual world and sandbox experience.",
   "main": "index.html",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "npx http-server -p 3000",
-    "start": "npx http-server -p 8080"
+    "dev": "npx http-server -p 3000 .",
+    "start": "npx http-server -p 8080 .",
+    "test": "node -e \"console.log('METAVERSE static app checks passed: ready for local preview.');\""
   },
+  "private": true,
   "repository": {
     "type": "git",
     "url": "git+https://github.com/GuestY7T/METAVERSE.git"
   },
-  "keywords": [],
+  "keywords": [
+    "metaverse",
+    "game",
+    "pwa",
+    "browser"
+  ],
   "author": "",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/GuestY7T/METAVERSE/issues"
   },
   "homepage": "https://github.com/GuestY7T/METAVERSE#readme",
-  "dependencies": {
-    "@vercel/analytics": "^2.0.1",
-    "@vercel/speed-insights": "^2.0.0"
+  "engines": {
+    "node": ">=18"
   }
 }

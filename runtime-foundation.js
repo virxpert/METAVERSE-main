@@ -314,7 +314,7 @@
     var cards = document.querySelectorAll('.game-card');
     for (var i = 0; i < cards.length; i += 1) {
       cards[i].style.transformOrigin = 'center center';
-      cards[i].style.scale = String(policy.cardDensity);
+      cards[i].style.transform = 'scale(' + String(policy.cardDensity) + ')';
       cards[i].style.transitionDuration = policy.motion === 'reduced' ? '0s' : '0.2s';
     }
 
@@ -1103,20 +1103,41 @@
 
   function appendChatMessage(channel, author, text, isBot) {
     var chatBox = safeById('chat-' + channel);
-    if (!chatBox) return;
-    var item = document.createElement('div');
-    item.className = isBot ? 'chat-msg bot' : 'chat-msg';
-    var label = document.createElement('span');
-    label.textContent = author + ':';
-    var body = document.createTextNode(' ' + text);
-    item.appendChild(label);
-    item.appendChild(body);
-    chatBox.appendChild(item);
-    // Keep chat containers bounded so long sessions stay responsive.
-    while (chatBox.childElementCount > 70) {
-      chatBox.removeChild(chatBox.firstElementChild);
+    var safeChannel = (channel || 'global').toString();
+    var safeAuthor = sanitizePlainText(author || 'System', 32);
+    var safeText = sanitizePlainText(text || '', 420);
+
+    if (chatBox) {
+      var item = document.createElement('div');
+      item.className = isBot ? 'chat-msg bot' : 'chat-msg';
+      var label = document.createElement('span');
+      label.textContent = safeAuthor + ':';
+      var body = document.createTextNode(' ' + safeText);
+      item.appendChild(label);
+      item.appendChild(body);
+      chatBox.appendChild(item);
+      while (chatBox.childElementCount > 70) {
+        chatBox.removeChild(chatBox.firstElementChild);
+      }
+      chatBox.scrollTop = chatBox.scrollHeight;
     }
-    chatBox.scrollTop = chatBox.scrollHeight;
+
+    if (uiState && uiState.chatHistory && Object.prototype.hasOwnProperty.call(uiState.chatHistory, safeChannel)) {
+      uiState.chatHistory[safeChannel].push({
+        author: safeAuthor,
+        text: safeText,
+        isBot: !!isBot,
+        ts: Date.now()
+      });
+      while (uiState.chatHistory[safeChannel].length > 60) {
+        uiState.chatHistory[safeChannel].shift();
+      }
+      try {
+        localStorage.setItem('mv-chat-history-v1', JSON.stringify(uiState.chatHistory));
+      } catch (err) {
+        // Ignore persistence errors in restricted contexts.
+      }
+    }
   }
 
   function formatCount(value) {
@@ -1302,7 +1323,10 @@
       { id: 'drift-lab', icon: '🛞', iconKey: 'racer', name: 'Drift Lab Sprint', players: 670, min: 360, max: 1800 },
       { id: 'sky-forge', icon: '🛰️', iconKey: 'drone', name: 'Sky Forge Ops', players: 780, min: 420, max: 2100 },
       { id: 'pulse-heist', icon: '🔐', iconKey: 'shield', name: 'Pulse Heist Run', players: 520, min: 280, max: 1600 },
-      { id: 'neon-harvest', icon: '🌌', iconKey: 'neon', name: 'Neon Harvest Arena', players: 970, min: 560, max: 2600 }
+      { id: 'neon-harvest', icon: '🌌', iconKey: 'neon', name: 'Neon Harvest Arena', players: 970, min: 560, max: 2600 },
+      { id: 'metaverse-hub-2', icon: '🌐', iconKey: 'portal', name: 'METAVERSE Hub 2.0', players: 480, min: 180, max: 1400, sourceUrl: '../metaverse_latest/METAVERSE_latest.html', sourceType: 'external' },
+      { id: 'metaverse-offline', icon: '💾', iconKey: 'shield', name: 'Metaverse Offline', players: 220, min: 70, max: 820, sourceUrl: '../metaverse_latest/metaverse_offline/index.html', sourceType: 'external' },
+      { id: 'metaverse-connect', icon: '🔗', iconKey: 'companion', name: 'METAVERSE Connect', players: 310, min: 110, max: 980, sourceUrl: '../metaverse_latest/metaverse_offline/index.html', sourceType: 'external' }
     ];
   }
 
@@ -1538,6 +1562,74 @@
     button.textContent = on ? 'ON' : 'OFF';
   }
 
+  function toggleTheme() {
+    var body = document.body;
+    var isLight = body.classList.toggle('mv-theme-light');
+    var toggle = safeById('theme-toggle');
+    if (toggle) {
+      toggle.textContent = isLight ? '☾' : '☼';
+    }
+    setText('rt-last-action', 'theme ' + (isLight ? 'light' : 'night'));
+  }
+
+  window.toggleTheme = function () {
+    toggleTheme();
+  };
+
+  function toggleNotifications() {
+    var dropdown = safeById('notifications-dropdown');
+    if (!dropdown) return;
+    var isOpen = dropdown.classList.toggle('active');
+    setText('rt-last-action', isOpen ? 'notifications open' : 'notifications closed');
+  }
+
+  window.toggleNotifications = function () {
+    toggleNotifications();
+  };
+
+  function toggleFullscreen() {
+    var root = document.documentElement;
+    var isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+
+    if (!isFullscreen) {
+      if (root.requestFullscreen) root.requestFullscreen();
+      else if (root.webkitRequestFullscreen) root.webkitRequestFullscreen();
+      else if (root.mozRequestFullScreen) root.mozRequestFullScreen();
+      else if (root.msRequestFullscreen) root.msRequestFullscreen();
+    } else {
+      if (document.exitFullscreen) document.exitFullscreen();
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      else if (document.mozCancelFullScreen) document.mozCancelFullScreen();
+      else if (document.msExitFullscreen) document.msExitFullscreen();
+    }
+    setText('rt-last-action', isFullscreen ? 'fullscreen exited' : 'fullscreen entered');
+  }
+
+  window.toggleFullscreen = function () {
+    toggleFullscreen();
+  };
+
+  function updateFullscreenButtonState() {
+    var button = safeById('fullscreen-btn');
+    if (!button) return;
+    var isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+    button.textContent = isFullscreen ? '⛶' : '⛶';
+    button.title = isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen';
+  }
+
+  document.addEventListener('fullscreenchange', updateFullscreenButtonState);
+  document.addEventListener('webkitfullscreenchange', updateFullscreenButtonState);
+  document.addEventListener('mozfullscreenchange', updateFullscreenButtonState);
+  document.addEventListener('MSFullscreenChange', updateFullscreenButtonState);
+  document.addEventListener('click', function (event) {
+    var dropdown = safeById('notifications-dropdown');
+    var bell = safeById('notification-btn');
+    if (!dropdown || !bell) return;
+    if (!dropdown.contains(event.target) && !bell.contains(event.target)) {
+      dropdown.classList.remove('active');
+    }
+  });
+
   function wireRuntimePanel(runtime) {
     window.addEventListener('dc200:profile', function (evt) {
       var profile = evt.detail;
@@ -1649,6 +1741,12 @@
       shopBusy: false,
       previousDisplayName: runtime.identity784.globalIdentity.displayName,
       aiBusy: false,
+      botCaptcha: {
+        passed: false,
+        pendingAction: null,
+        challenge: null,
+        actionLabel: 'continue'
+      },
       aiBrain: createAiBrain(),
       debug: {
         active: false,
@@ -1669,6 +1767,11 @@
         friendSearch: '',
         friendCandidates: [],
         friends: ['NovaBuilder', 'SkyRunner', 'VoxelBee']
+      },
+      chatHistory: {
+        global: [],
+        friends: [],
+        ai: []
       },
       profile: {
         displayName: 'Nano_banana',
@@ -1834,9 +1937,9 @@
         { id: 'debug-hunter', name: 'Debug Hunter', iconKey: 'bot' },
         { id: 'clean-sweep', name: 'Clean Sweep', iconKey: 'shield' },
         { id: 'storm-stabilizer', name: 'Storm Stabilizer', iconKey: 'drone' },
-        { id: 'badge-collector-10', name: 'Badge Collector X', iconKey: 'emote' },
-        { id: 'badge-collector-20', name: 'Badge Collector XX', iconKey: 'emote' },
-        { id: 'badge-collector-30', name: 'Badge Collector XXX', iconKey: 'emote' },
+        { id: 'badge-collector-10', name: 'Badge Collector 10', iconKey: 'emote' },
+        { id: 'badge-collector-20', name: 'Badge Collector 20', iconKey: 'emote' },
+        { id: 'badge-collector-30', name: 'Badge Collector 30', iconKey: 'emote' },
         { id: 'color-overdrive', name: 'Color Overdrive', iconKey: 'emote' },
         { id: 'future-signal', name: 'Future Signal', iconKey: 'neon' },
         { id: 'adaptive-legacy', name: 'Adaptive Legacy', iconKey: 'settings' },
@@ -2333,6 +2436,68 @@
       }
     }
 
+    function saveChatHistory() {
+      try {
+        localStorage.setItem('mv-chat-history-v1', JSON.stringify(uiState.chatHistory || { global: [], friends: [], ai: [] }));
+      } catch (err) {
+        // Ignore persistence errors in restricted contexts.
+      }
+    }
+
+    function loadChatHistory() {
+      try {
+        var raw = localStorage.getItem('mv-chat-history-v1');
+        if (!raw) {
+          uiState.chatHistory = {
+            global: [{ author: 'System', text: 'Welcome to the METAVERSE sandbox. Local session state is active.', isBot: true, ts: Date.now() }],
+            friends: [{ author: 'System', text: 'Your party channel is ready for quick team updates.', isBot: true, ts: Date.now() }],
+            ai: [{ author: 'AI', text: 'AI assistant online. Ask about launch flow, ideas, or gameplay tuning.', isBot: true, ts: Date.now() }]
+          };
+          return;
+        }
+        var parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') {
+          uiState.chatHistory = { global: [], friends: [], ai: [] };
+          return;
+        }
+        uiState.chatHistory = {
+          global: Array.isArray(parsed.global) ? parsed.global.slice(-60) : [],
+          friends: Array.isArray(parsed.friends) ? parsed.friends.slice(-60) : [],
+          ai: Array.isArray(parsed.ai) ? parsed.ai.slice(-60) : []
+        };
+        if (!uiState.chatHistory.global.length) {
+          uiState.chatHistory.global.push({ author: 'System', text: 'Welcome to the METAVERSE sandbox. Local session state is active.', isBot: true, ts: Date.now() });
+        }
+        if (!uiState.chatHistory.friends.length) {
+          uiState.chatHistory.friends.push({ author: 'System', text: 'Your party channel is ready for quick team updates.', isBot: true, ts: Date.now() });
+        }
+        if (!uiState.chatHistory.ai.length) {
+          uiState.chatHistory.ai.push({ author: 'AI', text: 'AI assistant online. Ask about launch flow, ideas, or gameplay tuning.', isBot: true, ts: Date.now() });
+        }
+      } catch (err) {
+        uiState.chatHistory = { global: [], friends: [], ai: [] };
+      }
+    }
+
+    function renderChatHistory(channel) {
+      var chatBox = safeById('chat-' + channel);
+      if (!chatBox || !uiState.chatHistory) return;
+      chatBox.textContent = '';
+      var entries = (uiState.chatHistory[channel] || []).slice(-60);
+      for (var i = 0; i < entries.length; i += 1) {
+        var entry = entries[i] || {};
+        var item = document.createElement('div');
+        item.className = entry.isBot ? 'chat-msg bot' : 'chat-msg';
+        var label = document.createElement('span');
+        label.textContent = (entry.author || 'System') + ':';
+        var body = document.createTextNode(' ' + (entry.text || ''));
+        item.appendChild(label);
+        item.appendChild(body);
+        chatBox.appendChild(item);
+      }
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
     function saveRecentExperiences(list) {
       try {
         localStorage.setItem('mv-recent-experiences-v1', JSON.stringify(list || []));
@@ -2689,6 +2854,21 @@
       submitOnEnter(safeById('auth-signup-user'), function () { window.submitAuthSignup(); });
       submitOnEnter(safeById('auth-signup-pass'), function () { window.submitAuthSignup(); });
       submitOnEnter(safeById('auth-signup-about'), function () { window.submitAuthSignup(); });
+    }
+
+    function bindChatInputShortcuts() {
+      function submitOnEnter(node, action) {
+        if (!node) return;
+        node.addEventListener('keydown', function (evt) {
+          if (evt.key !== 'Enter') return;
+          evt.preventDefault();
+          action();
+        });
+      }
+
+      submitOnEnter(safeById('chat-input-global'), function () { sendChatMessage('global'); });
+      submitOnEnter(safeById('chat-input-friends'), function () { sendChatMessage('friends'); });
+      submitOnEnter(safeById('chat-input-ai'), function () { sendAiMessage(); });
     }
 
     function setAuthMode(mode) {
@@ -3883,8 +4063,37 @@
     };
 
     window.closeModals = function () {
+      if (uiState && uiState.botCaptcha && uiState.botCaptcha.pendingAction) {
+        uiState.botCaptcha.pendingAction = null;
+        uiState.botCaptcha.challenge = null;
+        uiState.botCaptcha.passed = false;
+        var errorNode = safeById('bot-captcha-error');
+        if (errorNode) errorNode.textContent = '';
+      }
       closeAllModals();
       window.showDashboard();
+    };
+
+    window.openAllMetaverseProjects = function () {
+      var list = uiState && uiState.experiences ? uiState.experiences : [];
+      var opened = 0;
+      for (var i = 0; i < list.length; i += 1) {
+        var exp = list[i];
+        if (!exp || !exp.sourceUrl || typeof exp.sourceUrl !== 'string') continue;
+        try {
+          if (window.open(exp.sourceUrl, '_blank', 'noopener,noreferrer')) opened += 1;
+        } catch (err) {
+          // Ignore popup blockers during batched launches.
+        }
+      }
+
+      if (!opened) {
+        appendChatMessage('global', 'System', 'No Metaverse project URLs are available to open right now.', true);
+        return;
+      }
+
+      appendChatMessage('global', 'System', 'Opened ' + opened + ' Metaverse project(s) in new tabs.', true);
+      setText('rt-last-action', 'opened all metaverse apps');
     };
 
     window.launchGame = function (gameId) {
@@ -3910,6 +4119,23 @@
 
       setText('rt-last-action', 'launch request: ' + gameId);
       runtime.identity784.setCurrentMode(gameId);
+      if (exp && exp.sourceUrl) {
+        try {
+          var externalWindow = window.open(exp.sourceUrl, '_blank', 'noopener,noreferrer');
+          if (externalWindow) {
+            pushRecentExperience(exp);
+            bumpEvidence('gameplayLaunches');
+            renderOnboardingTips();
+            uiState.aiBrain.memory.lastLaunched = exp.id;
+            uiState.aiBrain.memory.preferredMode = exp.id;
+            appendChatMessage('global', 'System', 'Opening external METAVERSE project: ' + exp.name + '.', true);
+            return;
+          }
+        } catch (err) {
+          appendChatMessage('global', 'System', 'External project launch blocked by browser settings: ' + exp.name + '.', true);
+        }
+      }
+
       if (exp) {
         pushRecentExperience(exp);
         bumpEvidence('gameplayLaunches');
@@ -3921,6 +4147,44 @@
         appendChatMessage('global', 'System', 'Launch request accepted for ' + gameId + '. Session bootstrap pipeline queued.', true);
       }
       closeModals();
+    };
+
+    function resolveMergedProjectTargets() {
+      var candidates = [
+        './index.html',
+        './offline.html',
+        './archive/METAVERSE_v1.4.html'
+      ];
+      var seen = {};
+      var list = [];
+      for (var i = 0; i < candidates.length; i += 1) {
+        var value = String(candidates[i] || '').trim();
+        if (!value || seen[value]) continue;
+        seen[value] = true;
+        list.push(value);
+      }
+      return list;
+    }
+
+    window.openAllMetaverseProjects = function () {
+      var targets = resolveMergedProjectTargets();
+      var opened = 0;
+      for (var i = 0; i < targets.length; i += 1) {
+        try {
+          var w = window.open(targets[i], '_blank', 'noopener,noreferrer');
+          if (w) opened += 1;
+        } catch (err) {
+          // Keep open-all resilient if browser blocks popups.
+        }
+      }
+
+      if (!opened) {
+        appendChatMessage('global', 'System', 'No METAVERSE project windows were allowed to open this session.', true);
+        return;
+      }
+
+      appendChatMessage('global', 'System', 'Opened ' + opened + ' METAVERSE project window(s) from the canonical launcher.', true);
+      setText('rt-last-action', 'opened all metaverse project variants');
     };
 
     window.runBigCheck = function () {
@@ -3999,6 +4263,46 @@
       return ok;
     };
 
+    window.claimDailyReward = function () {
+      var rewardKey = 'mv-daily-reward-date';
+      var statusNode = safeById('daily-reward-status');
+      try {
+        var today = new Date();
+        var stamp = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+        var lastStamp = localStorage.getItem(rewardKey);
+
+        if (lastStamp === stamp) {
+          if (statusNode) statusNode.textContent = 'Daily reward already claimed for today. Come back tomorrow for another bonus.';
+          appendChatMessage('global', 'Reward', 'Daily reward already claimed for today.', true);
+          window.openModal('modal-daily');
+          setText('rt-last-action', 'daily reward already claimed');
+          return;
+        }
+
+        var coinsNode = safeById('user-coins');
+        var xpNode = safeById('user-xp');
+        var currentCoins = Number(coinsNode ? coinsNode.textContent : '500') || 500;
+        var currentXp = Number(xpNode ? xpNode.textContent : '1000') || 1000;
+        var bonusCoins = 200;
+        var bonusXp = 500;
+
+        var nextCoins = currentCoins + bonusCoins;
+        var nextXp = currentXp + bonusXp;
+        if (coinsNode) coinsNode.textContent = String(nextCoins);
+        if (xpNode) xpNode.textContent = String(nextXp);
+        localStorage.setItem(rewardKey, stamp);
+
+        if (statusNode) statusNode.textContent = 'Reward claimed: M$ ' + bonusCoins + ' + ' + bonusXp + ' XP.';
+        appendChatMessage('global', 'Reward', 'Daily reward claimed: M$ ' + bonusCoins + ' and ' + bonusXp + ' XP added.', true);
+        window.openModal('modal-daily');
+        setText('rt-last-action', 'daily reward claimed');
+      } catch (err) {
+        if (statusNode) statusNode.textContent = 'Daily reward unavailable in this browser session.';
+        appendChatMessage('global', 'Reward', 'Daily reward unavailable. Local storage access is blocked.', true);
+        setText('rt-last-action', 'daily reward failed');
+      }
+    };
+
     window.openRulesReference = function () {
       var note = safeById('rules-reference-note');
       if (note) {
@@ -4023,42 +4327,44 @@
     };
 
     window.createCommunity = function () {
-      var nameInput = safeById('community-name');
-      var visibilityInput = safeById('community-visibility');
-      var membersInput = safeById('community-members');
-      if (!nameInput || !visibilityInput || !membersInput) return;
+      window.runWithBotCaptcha('create a community', function () {
+        var nameInput = safeById('community-name');
+        var visibilityInput = safeById('community-visibility');
+        var membersInput = safeById('community-members');
+        if (!nameInput || !visibilityInput || !membersInput) return;
 
-      var name = sanitizePlainText(nameInput.value, 36);
-      var visibility = (visibilityInput.value || 'public').trim().toLowerCase();
-      var membersRaw = sanitizePlainText(membersInput.value, 180);
-      if (!name) {
-        appendChatMessage('global', 'System', 'Community name is required.', true);
-        return;
-      }
-      if (!/^(public|private|unlisted)$/.test(visibility)) visibility = 'public';
-
-      var members = ['Creator'];
-      if (membersRaw) {
-        var bits = membersRaw.split(',');
-        for (var i = 0; i < bits.length; i += 1) {
-          var person = bits[i].trim();
-          person = sanitizePlainText(person, 28);
-          if (!person) continue;
-          if (members.indexOf(person) === -1) members.push(person);
+        var name = sanitizePlainText(nameInput.value, 36);
+        var visibility = (visibilityInput.value || 'public').trim().toLowerCase();
+        var membersRaw = sanitizePlainText(membersInput.value, 180);
+        if (!name) {
+          appendChatMessage('global', 'System', 'Community name is required.', true);
+          return;
         }
-      }
+        if (!/^(public|private|unlisted)$/.test(visibility)) visibility = 'public';
 
-      var id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 28);
-      if (!id) id = 'community-' + Date.now();
-      uiState.communities.list.unshift({ id: id, name: name, visibility: visibility, members: members, games: 0 });
-      if (uiState.communities.list.length > 24) uiState.communities.list = uiState.communities.list.slice(0, 24);
-      saveCommunities();
-      bumpEvidence('communityCreates');
-      renderCommunities();
-      appendChatMessage('global', 'Community', 'Created ' + name + ' (' + visibility + ') with ' + members.length + ' member(s).', true);
-      nameInput.value = '';
-      membersInput.value = '';
-      setText('rt-last-action', 'community created: ' + name);
+        var members = ['Creator'];
+        if (membersRaw) {
+          var bits = membersRaw.split(',');
+          for (var i = 0; i < bits.length; i += 1) {
+            var person = bits[i].trim();
+            person = sanitizePlainText(person, 28);
+            if (!person) continue;
+            if (members.indexOf(person) === -1) members.push(person);
+          }
+        }
+
+        var id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 28);
+        if (!id) id = 'community-' + Date.now();
+        uiState.communities.list.unshift({ id: id, name: name, visibility: visibility, members: members, games: 0 });
+        if (uiState.communities.list.length > 24) uiState.communities.list = uiState.communities.list.slice(0, 24);
+        saveCommunities();
+        bumpEvidence('communityCreates');
+        renderCommunities();
+        appendChatMessage('global', 'Community', 'Created ' + name + ' (' + visibility + ') with ' + members.length + ' member(s).', true);
+        nameInput.value = '';
+        membersInput.value = '';
+        setText('rt-last-action', 'community created: ' + name);
+      });
     };
 
     window.createCommunityGame = function (communityId) {
@@ -4179,7 +4485,91 @@
       setText('rt-last-action', 'chat closed');
     };
 
+    window.generateBotCaptcha = function () {
+      var left = 2 + Math.floor(Math.random() * 9);
+      var right = 2 + Math.floor(Math.random() * 9);
+      var useAdd = Math.random() < 0.5;
+      var answer = useAdd ? left + right : left - right;
+      var expression = left + (useAdd ? ' + ' : ' - ') + right + ' = ?';
+      return {
+        prompt: expression,
+        answer: String(answer)
+      };
+    };
+
+    window.startBotCaptcha = function (actionLabel, action) {
+      var challenge = window.generateBotCaptcha();
+      if (!uiState || !uiState.botCaptcha) return false;
+      uiState.botCaptcha.passed = false;
+      uiState.botCaptcha.actionLabel = actionLabel || 'continue';
+      uiState.botCaptcha.pendingAction = typeof action === 'function' ? action : null;
+      uiState.botCaptcha.challenge = challenge;
+
+      var promptNode = safeById('bot-captcha-question');
+      var labelNode = safeById('bot-captcha-label');
+      var answerNode = safeById('bot-captcha-answer');
+      var errorNode = safeById('bot-captcha-error');
+      if (promptNode) promptNode.textContent = challenge.prompt;
+      if (labelNode) labelNode.textContent = 'Verify you are human to ' + uiState.botCaptcha.actionLabel + '.';
+      if (answerNode) answerNode.value = '';
+      if (errorNode) errorNode.textContent = '';
+      window.openModal('modal-bot-captcha');
+      return true;
+    };
+
+    window.submitBotCaptcha = function () {
+      var answerNode = safeById('bot-captcha-answer');
+      var answer = sanitizePlainText(answerNode ? answerNode.value : '', 12);
+      if (!uiState || !uiState.botCaptcha || !uiState.botCaptcha.challenge) return false;
+      if (answer !== uiState.botCaptcha.challenge.answer) {
+        var errorNode = safeById('bot-captcha-error');
+        if (errorNode) errorNode.textContent = 'Wrong answer. Try again.';
+        return false;
+      }
+
+      uiState.botCaptcha.passed = true;
+      var nextAction = uiState.botCaptcha.pendingAction;
+      uiState.botCaptcha.pendingAction = null;
+      uiState.botCaptcha.challenge = null;
+      closeModals();
+      if (typeof nextAction === 'function') {
+        nextAction();
+      }
+      return true;
+    };
+
+    window.runWithBotCaptcha = function (actionLabel, action) {
+      if (!uiState || !uiState.botCaptcha) return false;
+      if (uiState.botCaptcha.passed) {
+        if (typeof action === 'function') action();
+        return true;
+      }
+      return window.startBotCaptcha(actionLabel, action);
+    };
+
     window.toggleAiAssistant = function () {
+      if (!uiState.botCaptcha.passed) {
+        window.runWithBotCaptcha('open the AI assistant', function () {
+          document.body.classList.remove('chat-closed');
+          var aiPanel = safeById('panel-ai');
+          var aiIsOpen = !!(aiPanel && aiPanel.classList.contains('active'));
+
+          if (aiIsOpen) {
+            window.switchChatTab('global');
+            document.body.classList.remove('ai-mobile-open');
+            document.body.classList.remove('chat-minimized');
+            return;
+          }
+
+          document.body.classList.remove('chat-minimized');
+          document.body.classList.add('ai-mobile-open');
+          window.switchChatTab('ai');
+          var aiInput = safeById('chat-input-ai');
+          if (aiInput) aiInput.focus();
+        });
+        return;
+      }
+
       document.body.classList.remove('chat-closed');
       var aiPanel = safeById('panel-ai');
       var aiIsOpen = !!(aiPanel && aiPanel.classList.contains('active'));
@@ -4213,6 +4603,29 @@
       }
 
       input.value = '';
+    };
+
+    window.forwardChatMessage = function (channel) {
+      if (channel !== 'global' && channel !== 'friends') return;
+      var input = safeById('chat-input-' + channel);
+      if (!input) return;
+      var text = sanitizePlainText(input.value, 280);
+      if (!text) return;
+
+      var targetChannel = channel === 'global' ? 'friends' : 'global';
+      var targetInput = safeById('chat-input-' + targetChannel);
+      if (targetInput) {
+        targetInput.value = text;
+        appendChatMessage(channel, 'Relay', 'Forwarded to ' + targetChannel + ' channel.', true);
+        appendChatMessage(targetChannel, 'Relay', text, true);
+      } else {
+        appendChatMessage(channel, 'Relay', 'No channel available to forward to.', true);
+      }
+
+      input.value = '';
+      if (targetInput) {
+        window.switchChatTab(targetChannel);
+      }
     };
 
     window.queueShopItem = async function (itemName, price) {
@@ -4280,16 +4693,21 @@
     };
 
     window.runSandboxProbe = async function () {
-      bumpEvidence('sandboxProbes');
-      var denyResult = await runtime.sandbox871.execute({
-        capability: 'network.fetch',
-        payload: { url: 'http://example.com' }
+      window.runWithBotCaptcha('run a sandbox probe', function () {
+        bumpEvidence('sandboxProbes');
+        runtime.sandbox871.execute({
+          capability: 'network.fetch',
+          payload: { url: 'http://example.com' }
+        }).then(function (denyResult) {
+          if (!denyResult.ok) {
+            appendChatMessage('global', 'Security', 'Sandbox probe blocked as expected: ' + denyResult.error, true);
+          } else {
+            appendChatMessage('global', 'Security', 'Warning: probe unexpectedly succeeded.', true);
+          }
+        }).catch(function (err) {
+          appendChatMessage('global', 'Security', 'Sandbox probe error: ' + (err && err.message ? err.message : String(err)), true);
+        });
       });
-      if (!denyResult.ok) {
-        appendChatMessage('global', 'Security', 'Sandbox probe blocked as expected: ' + denyResult.error, true);
-      } else {
-        appendChatMessage('global', 'Security', 'Warning: probe unexpectedly succeeded.', true);
-      }
     };
 
     window.toggleSetting = function (settingKey) {
@@ -4392,23 +4810,26 @@
         return;
       }
 
+      window.runWithBotCaptcha('ask the AI assistant', function () {
+        uiState.aiBusy = true;
+        bumpEvidence('aiPrompts');
+        if (sendButton) sendButton.disabled = true;
+        appendChatMessage('ai', 'You', text, false);
+        input.value = '';
 
-      uiState.aiBusy = true;
-      bumpEvidence('aiPrompts');
-      if (sendButton) sendButton.disabled = true;
-      appendChatMessage('ai', 'You', text, false);
-      input.value = '';
-
-      try {
-        await new Promise(function (resolve) { setTimeout(resolve, 150); });
-        var result = buildAiReply(text, runtime, uiState.aiBrain);
-        appendChatMessage('ai', 'AI', result.message, true);
-        rememberAiTurn(uiState.aiBrain, text, result.intent, snapshotUiContext(runtime), result.message);
-        setText('rt-last-action', 'ai response generated');
-      } finally {
-        uiState.aiBusy = false;
-        if (sendButton) sendButton.disabled = false;
-      }
+        (async function () {
+          try {
+            await new Promise(function (resolve) { setTimeout(resolve, 150); });
+            var result = buildAiReply(text, runtime, uiState.aiBrain);
+            appendChatMessage('ai', 'AI', result.message, true);
+            rememberAiTurn(uiState.aiBrain, text, result.intent, snapshotUiContext(runtime), result.message);
+            setText('rt-last-action', 'ai response generated');
+          } finally {
+            uiState.aiBusy = false;
+            if (sendButton) sendButton.disabled = false;
+          }
+        })();
+      });
     };
 
     function isSubmitKey(evt) {
@@ -4491,6 +4912,10 @@
     loadOnboardingState();
     loadIdeaLabState();
     loadSecrets();
+    loadChatHistory();
+    renderChatHistory('global');
+    renderChatHistory('friends');
+    renderChatHistory('ai');
     renderBadgePanel();
     renderDebugFindings();
     renderFriendBrowser();
